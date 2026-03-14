@@ -57,6 +57,9 @@ if "start_from" not in st.session_state:
 # Floor filter for map (MazeMap-style: view one floor at a time)
 if "selected_floor" not in st.session_state:
     st.session_state.selected_floor = None  # None = all floors, 0 = Ground, 1 = Floor 1, etc.
+# Live location: show browser location-request UI
+if "show_location_request" not in st.session_state:
+    st.session_state.show_location_request = False
 
 # High-contrast mode
 if "high_contrast" not in st.session_state:
@@ -120,6 +123,31 @@ conn = get_connection()
 
 # ----- Campus Map (MazeMap-style: indoor navigation, floor maps, turn-by-turn) -----
 if page == "Campus Map":
+    # ----- Live location from browser GPS (e.g. IIT Patna hostel → library) -----
+    try:
+        qp = st.query_params
+        lat_param = qp.get("lat")
+        lng_param = qp.get("lng")
+        if lat_param is not None and lng_param is not None:
+            try:
+                lat_val = float(lat_param)
+                lng_val = float(lng_param)
+                st.session_state.start_from = {
+                    "name": "My live location (GPS)",
+                    "lat": lat_val,
+                    "lng": lng_val,
+                }
+                st.session_state.show_location_request = False
+                # Remove params from URL so refresh doesn't reapply
+                if "lat" in qp:
+                    del qp["lat"]
+                if "lng" in qp:
+                    del qp["lng"]
+            except (ValueError, TypeError):
+                pass
+    except Exception:
+        pass
+
     buildings = get_buildings(conn)
     facilities_all = get_all_facilities_flat(conn)
     focus = st.session_state.map_focus
@@ -164,26 +192,66 @@ if page == "Campus Map":
 
     # Step 1: Where are you now?
     st.markdown("**Step 1: Where are you now?**")
+    st.caption("Choose a place from the list, or use your **live GPS location** (e.g. if you are at hostel, IIT Patna).")
+    if st.button("📍 Use my live location (turn on location)", key="btn_use_live_loc", type="primary"):
+        st.session_state.show_location_request = True
+        st.rerun()
+    if st.session_state.get("show_location_request"):
+        st.info("Allow location access in the browser when prompted. The page will refresh with your current position (e.g. hostel) as the start point.")
+        geo_html = """
+        <script>
+        (function() {
+            if (!navigator.geolocation) {
+                document.body.innerHTML = '<p style="padding:1rem;">Geolocation is not supported by your browser.</p>';
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                    var lat = pos.coords.latitude;
+                    var lng = pos.coords.longitude;
+                    var url = window.location.origin + window.location.pathname + '?lat=' + lat + '&lng=' + lng;
+                    if (window.location.search) url += '&' + window.location.search.replace(/^\\?/, '');
+                    window.location.href = url;
+                },
+                function(err) {
+                    document.body.innerHTML = '<p style="padding:1rem;">Location denied or unavailable. Please allow location access and try again, or choose a place from the list below.</p>';
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        })();
+        </script>
+        <p style="padding:1rem;">Getting your location… Please allow location access.</p>
+        """
+        st.components.v1.html(geo_html, height=80)
     start_options = [e["name"] for e in CAMPUS_ENTRANCES] + [b[1] for b in buildings]
+    if start_from and start_from.get("name") == "My live location (GPS)":
+        start_options = ["My live location (GPS)"] + [x for x in start_options if x != "My live location (GPS)"]
     start_choice = st.selectbox(
         "Your current location",
         start_options,
         key="start_choice",
         label_visibility="collapsed"
     )
-    start_from = None
-    for e in CAMPUS_ENTRANCES:
-        if e["name"] == start_choice:
-            start_from = e
-            break
-    if start_from is None:
-        for b in buildings:
-            if b[1] == start_choice:
-                start_from = {"name": b[1], "lat": b[2], "lng": b[3]}
+    if start_choice == "My live location (GPS)" and start_from and start_from.get("name") == "My live location (GPS)":
+        pass  # keep existing GPS-based start_from
+    else:
+        start_from = None
+        for e in CAMPUS_ENTRANCES:
+            if e["name"] == start_choice:
+                start_from = e
                 break
-    st.session_state.start_from = start_from
+        if start_from is None:
+            for b in buildings:
+                if b[1] == start_choice:
+                    start_from = {"name": b[1], "lat": b[2], "lng": b[3]}
+                    break
+        st.session_state.start_from = start_from
     if start_from:
-        st.caption(f"📍 Your location: **{start_from['name']}**")
+        if start_from.get("name") == "My live location (GPS)":
+            st.caption(f"📍 **My live location (GPS)** – e.g. hostel, IIT Patna. Now choose where you want to go (e.g. Library) below.")
+            st.caption("_Tip: If your campus is different (e.g. IIT Patna), add its buildings and Library in **Admin** so the route matches your campus._")
+        else:
+            st.caption(f"📍 Your location: **{start_from['name']}**")
 
     # Step 2: Where do you want to go?
     st.markdown("**Step 2: Where do you want to go?**")

@@ -1,6 +1,8 @@
 # CampusMate – Smart Navigation System for College Campuses
 
-A **software-only** smart navigation web app for **PR Pote Patil College of Engineering and Management, Amravati**. No hardware. Map + search + directions like Google Maps.
+A **software-only** smart navigation web app for **PR Pote Patil College of Engineering and Management, Amravati**. No hardware. Map + search + directions + **space booking**—all inside the app.
+
+📖 **Complete how-to:** see **[USER_GUIDE.md](USER_GUIDE.md)** for a full step-by-step guide (running the app, Campus Map, Book a space, Search, Accessibility, Admin, and an example walkthrough).
 
 ## Project structure (frontend + backend)
 
