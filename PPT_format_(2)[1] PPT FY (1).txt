@@ -1,0 +1,226 @@
+﻿CampusMate – Smart Navigation System for College 
+Campuses
+
+Artificial intelligence and data science 
+
+Name of Students Roll Number Name of Guide: Dr. A.B. Gadicha Sir  
+1.Vinay Raghuwanshi(L)             AIDSU22065 
+2. Sujal Nichat AIDSU22060
+3. Gayatri Ladhe                           AIDSU22006 Name of Co-Guide: prof. Abhiruchi 
+4. Swaraj Dhanade AIDSU22062 Mishra ma’am
+5. Khushi korde                            AIDSU22013
+
+Academic Year
+2025-26
+
+
+
+❖Outline
+
+1. Abstract 
+2. Introduction
+3. Related Work
+4. Research Gap
+5. Objective(s)/Problem Statement(s)
+6. Proposed Method
+7. Expected Outcome
+8. Conclusion
+9. Future Scope
+10.References
+
+
+
+❖ Abstract
+
+• Navigation inside large college campuses is often confusing for new students, parents, and visitors.
+
+• Existing tools like Google Maps are effective outdoors but do not support indoor or campus-level 
+navigation.
+
+• CampusMate is designed to solve this by providing a digital campus map, real-time facility search, 
+and accessibility features.
+
+• The system improves convenience, inclusivity, and time efficiency, ensuring smoother campus 
+exploration.
+
+• A step toward digital transformation of educational infrastructure in India.
+
+
+
+❖ Introduction
+
+• In the digital era, smart navigation systems have become essential for efficient movement across large 
+and complex environments.
+
+•    College campuses consist of multiple departments, buildings, labs, classrooms, and offices, 
+Which are difficult to locate for newcomers.
+
+•    Traditional aids like signboards and announcements are insufficient for large campuses
+
+•    Tools like Google Maps are optimized for outdoor routes but lack detail for campus interiors.
+
+•    CampusMate bridges this gap by offering campus-specific intelligent navigation with real-            
+time facility updates.
+
+•    Helps in time-saving, stress reduction, accessibility improvement, and overall better campus 
+experience.
+
+
+
+❖ Related Work
+
+Sr.N Name of Title (Year) Method(s)/Algorithm (s) Result Observation
+o.
+
+Sr. 
+Name of Title (Year) Method(s)/Algorithm(s) Result Observation
+
+No.
+
+Indoor Positioning Using Achieved 2–3m Low-cost but requires 
+1 BLE Beacon Triangulation
+
+Bluetooth Beacons (2022) indoor accuracy hardware setup
+
+Smart Campus Navigation QR Code-based location Accurate room-level Users must scan codes 
+2
+
+System using QR Codes (2021) tagging identification manually
+
+Google Maps Indoor Good for Not optimized for 
+3 GPS + Wi-Fi Mapping
+
+Navigation (2023) malls/airports Indian campuses
+
+AI-based Indoor Pathfinding Generated shortest High accuracy but 
+4 Dijkstra & A* Algorithm
+
+for Universities (2022) path dynamically complex deployment
+
+Mobile App for University Easy access to Lacked real-time 
+5 Android App + Database
+
+Navigation (2023) classrooms/facilities updates
+
+Improved 
+Accessible Campus Navigation Voice Assistance + IoT Expensive 
+
+6 accessibility for 
+for Visually Impaired (2024) Sensors infrastructure required
+
+blind users
+
+
+
+❖ Research Gap
+
+• No centralized navigation tool exists for Indian colleges/universities.
+
+• Absence of real-time update mechanisms for room changes or facility relocations.
+
+• Limited or no support for visually impaired and differently-abled users.
+
+• Current systems do not combine mapping with an admin panel, making maintenance difficult.
+
+• Lack of multi-language features makes it less usable for diverse and international students.
+
+• Complex campus layouts in India are not addressed effectively by existing apps.
+
+• Need for a scalable, inclusive, and practical solution that supports students, staff, and visitors 
+alike.
+
+
+
+❖Objective(s)/Problem Statement(s)
+
+•  To design an interactive and user-friendly digital map for college campuses.
+
+•  To provide real-time facility search for classrooms, labs, offices, and libraries.
+
+•  To integrate voice-based guidance and high-contrast accessibility features for inclusivity.
+
+•  To create an admin dashboard for updating facility details and room allocations dynamically.
+
+•   To enhance student experience, save time, and reduce confusion during navigation.
+
+
+
+❖ Proposed Methodology 
+
+System Architecture
+
+• Frontend: Web/Mobile App (React/Streamlit) for interactive user interface.
+• Backend: Python/Django with SQL database to store campus data securely.
+• Mapping: OpenStreetMap + custom SVG maps for floor-level details.
+• Accessibility: Voice navigation + contrast UI for differently-abled users.
+
+Modules
+
+• Campus Map Module – Interactive digital map with marked classrooms, labs, 
+        and offices.
+• Search Module – Search by faculty name, room number, or facility type.
+• Accessibility Module – Voice-based navigation, high-contrast visuals.
+• Admin Module – Real-time updates for classrooms, facilities, and schedules.
+
+
+
+❖ Result/Expected Outcome 
+
+• Simplified navigation across campus with accurate real-time directions.
+• Saves time for students, staff, and visitors by reducing confusion and delays.
+• Enhances productivity and punctuality in academic activities.
+• Promotes inclusivity by providing equal navigation support for differently-abled 
+
+individuals.
+• Digital modernization of campus infrastructure, aligning with smart campus initiatives.
+
+
+
+❖ Conclusion 
+
+• CampusMate offers a practical and scalable solution for navigation problems in large campuses.
+
+• It successfully combines digital mapping, search features, accessibility tools, and admin 
+controls.
+
+• The system addresses existing research gaps by providing inclusivity and real-time updates.
+
+• Can be scaled to other universities, hospitals, airports, and corporate campuses.
+
+• A step forward toward building a truly smart campus ecosystem.
+
+
+
+❖ Future Scope
+
+•   Integration with academic timetables, events, and examination halls.
+
+•   QR code-based entry navigation at building gates for quick access
+
+•   AI-powered crowd analysis during festivals, cultural events, or emergencies.
+
+•   Multi-language support for regional and international students.
+
+•   Linking with college management systems for attendance and schedules.
+
+•   Scalability to other institutions like universities, hospitals, and IT parks.
+
+•   Possibility of IoT integration for smart campus management.
+
+
+
+❖ References
+
+•OpenStreetMap – https://www.openstreetmap.org
+
+•Streamlit Documentation – https://streamlit.io
+
+•IEEE and ACM research papers on indoor navigation (last 3 years).
+
+•Academic works on smart campus and IoT-based navigation solutions.
+
+•Related studies on accessibility and human-computer interaction in navigation apps.
+
+
+
+Thank You
