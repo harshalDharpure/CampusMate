@@ -79,9 +79,16 @@ def apply_theme():
         div[data-testid="stSidebar"] .stMarkdown { color: #ffff00 !important; }
         </style>
         """, unsafe_allow_html=True)
+    # Hide Streamlit deploy/toolbar buttons and fix layout
     st.markdown("""
     <style>
-    .block-container { padding-top: 1rem; max-width: 100%%; }
+    /* Hide deploy and manage app buttons */
+    [data-testid="stToolbar"], .stDeployButton, [data-testid="stDecoration"], iframe[title="streamlit_toolbar"] { display: none !important; }
+    /* Clean main area – no cut-off, consistent padding */
+    .block-container { padding-top: 0.75rem; padding-bottom: 1rem; max-width: 100%%; }
+    .stMarkdown { margin-bottom: 0.25rem; }
+    /* Compact spacing for map page */
+    section[data-testid="stVerticalBlock"] > div { gap: 0.5rem; }
     @media (max-width: 768px) {
         .stButton button { min-height: 44px; padding: 12px 16px; }
         input[type="text"] { min-height: 44px; font-size: 16px; }
@@ -138,11 +145,6 @@ if page == "Campus Map":
                     "lng": lng_val,
                 }
                 st.session_state.show_location_request = False
-                # Remove params from URL so refresh doesn't reapply
-                if "lat" in qp:
-                    del qp["lat"]
-                if "lng" in qp:
-                    del qp["lng"]
             except (ValueError, TypeError):
                 pass
     except Exception:
@@ -154,87 +156,89 @@ if page == "Campus Map":
     start_from = st.session_state.start_from
     selected_floor = st.session_state.selected_floor
 
-    # ----- MazeMap-style header: Search + My location + Floor -----
-    st.markdown("#### 🗺️ Indoor campus map")
-    header_col1, header_col2, header_col3 = st.columns([2, 1, 1])
-    with header_col1:
-        search_map = st.text_input(
-            "Search",
-            placeholder="Search rooms, library, lab, department...",
-            key="map_search"
-        )
-    with header_col2:
-        st.caption("My location")
-        if st.button("📍 Show my location", key="btn_my_loc"):
-            if start_from:
-                st.session_state.map_focus = None  # clear destination so map centers on you
-            st.rerun()
-    with header_col3:
-        floor_options = ["All floors", "Ground (0)", "Floor 1", "Floor 2"]
-        floor_idx = 0 if selected_floor is None else (selected_floor + 1)
-        floor_choice = st.selectbox("Floor", floor_options, index=min(floor_idx, 3), key="floor_select")
-        if floor_choice == "All floors":
-            st.session_state.selected_floor = None
-        elif floor_choice == "Ground (0)":
-            st.session_state.selected_floor = 0
-        elif floor_choice == "Floor 1":
-            st.session_state.selected_floor = 1
-        elif floor_choice == "Floor 2":
-            st.session_state.selected_floor = 2
-        selected_floor = st.session_state.selected_floor
-    st.markdown("---")
-
     # Filter facilities by selected floor for map and list
     if selected_floor is not None:
         facilities = [f for f in facilities_all if f[4] == selected_floor]  # f[4] = floor
     else:
         facilities = facilities_all
 
-    # Step 1: Where are you now?
-    st.markdown("**Step 1: Where are you now?**")
-    st.caption("Choose a place from the list, or use your **live GPS location** (e.g. if you are at hostel, IIT Patna).")
-    if st.button("📍 Use my live location (turn on location)", key="btn_use_live_loc", type="primary"):
-        st.session_state.show_location_request = True
-        st.rerun()
-    if st.session_state.get("show_location_request"):
-        st.info("Allow location access in the browser when prompted. The page will refresh with your current position (e.g. hostel) as the start point.")
-        geo_html = """
-        <script>
-        (function() {
-            if (!navigator.geolocation) {
-                document.body.innerHTML = '<p style="padding:1rem;">Geolocation is not supported by your browser.</p>';
-                return;
-            }
-            navigator.geolocation.getCurrentPosition(
-                function(pos) {
-                    var lat = pos.coords.latitude;
-                    var lng = pos.coords.longitude;
-                    var url = window.location.origin + window.location.pathname + '?lat=' + lat + '&lng=' + lng;
-                    if (window.location.search) url += '&' + window.location.search.replace(/^\\?/, '');
-                    window.location.href = url;
-                },
-                function(err) {
-                    document.body.innerHTML = '<p style="padding:1rem;">Location denied or unavailable. Please allow location access and try again, or choose a place from the list below.</p>';
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        })();
-        </script>
-        <p style="padding:1rem;">Getting your location… Please allow location access.</p>
+    # ----- MAP FIRST (so it’s visible without scrolling) -----
+    if not buildings:
+        st.info("No buildings in database. Add them in Admin.")
+    else:
+        start_from_map = st.session_state.start_from
+        focus_map = st.session_state.map_focus
+        if focus_map and start_from_map:
+            lat0 = (start_from_map["lat"] + focus_map["lat"]) / 2
+            lng0 = (start_from_map["lng"] + focus_map["lng"]) / 2
+            zoom = 17
+        elif focus_map:
+            lat0, lng0 = focus_map["lat"], focus_map["lng"]
+            zoom = 18
+        else:
+            lat0, lng0 = buildings[0][2], buildings[0][3]
+            zoom = 17
+        m = folium.Map(location=[lat0, lng0], zoom_start=zoom, tiles="OpenStreetMap")
+        if focus_map and start_from_map:
+            route_points = [[start_from_map["lat"], start_from_map["lng"]], [CAMPUS_CENTER["lat"], CAMPUS_CENTER["lng"]], [focus_map["lat"], focus_map["lng"]]]
+            folium.PolyLine(locations=route_points, color="#1e88e5", weight=5, opacity=0.8, popup="Walking route").add_to(m)
+            folium.Marker([start_from_map["lat"], start_from_map["lng"]], popup=folium.Popup(f"<b>You are here</b><br>{start_from_map['name']}", max_width=200), tooltip="You are here", icon=folium.Icon(color="green", icon="user")).add_to(m)
+            folium.Circle(location=[start_from_map["lat"], start_from_map["lng"]], radius=25, color="green", fill=True, fill_color="green", fill_opacity=0.15, weight=2, dash_array="5, 5").add_to(m)
+            all_lats = [start_from_map["lat"], CAMPUS_CENTER["lat"], focus_map["lat"]]
+            all_lngs = [start_from_map["lng"], CAMPUS_CENTER["lng"], focus_map["lng"]]
+            m.fit_bounds([[min(all_lats), min(all_lngs)], [max(all_lats), max(all_lngs)]], padding=(30, 30))
+        campus_title_html = """
+        <div style="position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:9999;
+                    background:white; padding:10px 16px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.2);
+                    font-size:14px; font-weight:bold; text-align:center;">
+        PR Pote Patil College of Engineering and Management, Amravati<br>
+        <span style="font-size:11px; font-weight:normal;">Pote Estate, Kathora Road, Amravati – 444602</span>
+        </div>
         """
-        st.components.v1.html(geo_html, height=80)
+        m.get_root().html.add_child(folium.Element(campus_title_html))
+        legend_html = """
+        <div style="position:fixed; bottom:30px; left:10px; z-index:9999; background:white; padding:8px 12px; border-radius:6px; box-shadow:0 2px 6px rgba(0,0,0,0.2); font-size:12px;">
+        <b>Lab</b> <span style="color:green">●</span> &nbsp;
+        <b>Classroom</b> <span style="color:blue">●</span> &nbsp;
+        <b>Office</b> <span style="color:orange">●</span> &nbsp;
+        <b>Library</b> <span style="color:purple">●</span>
+        </div>
+        """
+        m.get_root().html.add_child(folium.Element(legend_html))
+        for b in buildings:
+            bid, name, lat, lng, desc = b
+            folium.Marker([lat, lng], popup=folium.Popup(f"<b>{name}</b><br>{desc or ''}", max_width=220), tooltip=name, icon=folium.Icon(color="red", icon="info-sign")).add_to(m)
+        for f in facilities:
+            fid, fname, room, ftype, floor, desc, bid, bname, lat, lng = f
+            color = FACILITY_COLORS.get(ftype, "blue")
+            popup_html = f"<b>{fname}</b> (Room {room})<br>{ftype}<br>Floor {floor}<br>{bname}"
+            folium.CircleMarker([lat, lng], radius=8, popup=folium.Popup(popup_html, max_width=220), tooltip=f"{fname} – {room}", color=color, fill=True, fillColor=color).add_to(m)
+        map_key = f"map_{start_from_map.get('lat') if start_from_map else 's'}_{focus_map.get('lat') if focus_map else 'f'}"
+        st_folium(m, use_container_width=True, height=420, key=map_key)
+    st.markdown("---")
+
+    # ----- Step 1: One button – Show my live location -----
+    st.markdown("**1. Set your current location**")
+    loc_col1, loc_col2 = st.columns([1, 2])
+    with loc_col1:
+        if st.button("📍 Show my live location", key="btn_use_live_loc", type="primary"):
+            st.session_state.show_location_request = True
+            st.rerun()
+    with loc_col2:
+        if start_from:
+            st.caption(f"📍 **{start_from.get('name', 'Your location')}**")
+        else:
+            st.caption("Tap the button to use GPS, or pick a place below.")
+    if st.session_state.get("show_location_request"):
+        st.caption("Allow location in the browser when prompted – the page will refresh with your position.")
+        geo_html = """<script>(function(){if(!navigator.geolocation){return;}navigator.geolocation.getCurrentPosition(function(pos){var u=window.location.origin+window.location.pathname+'?lat='+pos.coords.latitude+'&lng='+pos.coords.longitude;window.location.href=u;},function(){},{enableHighAccuracy:true,timeout:10000});})();</script><p style="padding:8px;">Getting location…</p>"""
+        st.components.v1.html(geo_html, height=50)
+    # Fallback: pick from list if not using GPS
     start_options = [e["name"] for e in CAMPUS_ENTRANCES] + [b[1] for b in buildings]
     if start_from and start_from.get("name") == "My live location (GPS)":
         start_options = ["My live location (GPS)"] + [x for x in start_options if x != "My live location (GPS)"]
-    start_choice = st.selectbox(
-        "Your current location",
-        start_options,
-        key="start_choice",
-        label_visibility="collapsed"
-    )
-    if start_choice == "My live location (GPS)" and start_from and start_from.get("name") == "My live location (GPS)":
-        pass  # keep existing GPS-based start_from
-    else:
+    start_choice = st.selectbox("Or pick a place instead", start_options, key="start_choice", label_visibility="collapsed")
+    if start_choice != "My live location (GPS)" or not (start_from and start_from.get("name") == "My live location (GPS)"):
         start_from = None
         for e in CAMPUS_ENTRANCES:
             if e["name"] == start_choice:
@@ -246,184 +250,57 @@ if page == "Campus Map":
                     start_from = {"name": b[1], "lat": b[2], "lng": b[3]}
                     break
         st.session_state.start_from = start_from
-    if start_from:
-        if start_from.get("name") == "My live location (GPS)":
-            st.caption(f"📍 **My live location (GPS)** – e.g. hostel, IIT Patna. Now choose where you want to go (e.g. Library) below.")
-            st.caption("_Tip: If your campus is different (e.g. IIT Patna), add its buildings and Library in **Admin** so the route matches your campus._")
-        else:
-            st.caption(f"📍 Your location: **{start_from['name']}**")
 
-    # Step 2: Where do you want to go?
-    st.markdown("**Step 2: Where do you want to go?**")
+    st.markdown("**2. Where do you want to go?**")
+    search_map = st.text_input("Search", placeholder="e.g. library, lab, room number...", key="map_search", label_visibility="collapsed")
     chip_cols = st.columns(4)
-    quick_queries = ["Library", "Lab", "Office", "Classroom"]
-    for i, q in enumerate(quick_queries):
+    for i, q in enumerate(["Library", "Lab", "Office", "Classroom"]):
         with chip_cols[i]:
             if st.button(f"📌 {q}", key=f"chip_{q}"):
-                rows = get_facilities(conn, search=q, facility_type=None)
-                if not rows and q.lower() == "library":
-                    rows = get_facilities(conn, facility_type="library")
-                if not rows and q.lower() == "lab":
-                    rows = get_facilities(conn, facility_type="lab")
-                if not rows and q.lower() == "office":
-                    rows = get_facilities(conn, facility_type="office")
-                if not rows and q.lower() == "classroom":
-                    rows = get_facilities(conn, facility_type="classroom")
+                rows = get_facilities(conn, search=q, facility_type=None) or get_facilities(conn, facility_type=q.lower())
                 if rows:
                     r = rows[0]
-                    fid, fname, room, ftype, floor, desc, bname, lat, lng = r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8]
-                    st.session_state.map_focus = {"lat": lat, "lng": lng, "name": fname, "building": bname, "floor": floor, "room": room, "facility_type": ftype}
+                    st.session_state.map_focus = {"lat": r[7], "lng": r[8], "name": r[1], "building": r[6], "floor": r[4], "room": r[2], "facility_type": r[3]}
                 st.rerun()
     if search_map.strip():
         rows = get_facilities(conn, search=search_map.strip(), facility_type=None)
-        faculty_rows = search_faculty(conn, search_map.strip())
-        if faculty_rows:
-            for r in faculty_rows:
-                rows.append((r[0], r[1], r[2], r[3], r[4], None, r[5], r[6], r[7]))
-        if rows:
-            st.caption("Tap a result to set destination:")
-            for r in rows[:15]:
-                fid, fname, room, ftype, floor, desc, bname, lat, lng = r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8]
-                label = f"{fname} (Room {room}) – {bname}"
-                if st.button(label, key=f"focus_{fid}_{lat}_{lng}"):
-                    st.session_state.map_focus = {
-                        "lat": lat, "lng": lng, "name": fname, "building": bname,
-                        "floor": floor, "room": room, "facility_type": ftype
-                    }
-                    st.rerun()
-        else:
-            st.info("No places found. Try 'library', 'lab', or a room number.")
+        for r in (rows or [])[:8]:
+            fid, fname, room, ftype, floor, desc, bname, lat, lng = r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8]
+            if st.button(f"{fname} ({room})", key=f"focus_{fid}_{lat}_{lng}"):
+                st.session_state.map_focus = {"lat": lat, "lng": lng, "name": fname, "building": bname, "floor": floor, "room": room, "facility_type": ftype}
+                st.rerun()
+    # Floor filter (optional, compact)
+    floor_options = ["All floors", "Ground (0)", "Floor 1", "Floor 2"]
+    floor_idx = 0 if selected_floor is None else (selected_floor + 1)
+    floor_choice = st.selectbox("Filter by floor", floor_options, index=min(floor_idx, 3), key="floor_select")
+    if floor_choice == "All floors": st.session_state.selected_floor = None
+    elif floor_choice == "Ground (0)": st.session_state.selected_floor = 0
+    elif floor_choice == "Floor 1": st.session_state.selected_floor = 1
+    elif floor_choice == "Floor 2": st.session_state.selected_floor = 2
+    selected_floor = st.session_state.selected_floor
 
-    # Turn-by-turn directions (MazeMap-style, like GPS indoors)
+    # Turn-by-turn directions
     if focus:
         st.markdown("---")
-        st.markdown("### 🧭 Turn-by-turn directions (indoors)")
         floor_word = "Ground floor" if focus["floor"] == 0 else f"Floor {focus['floor']}"
         st.markdown(f"""
         <div class="dir-card">
         <p><b>From</b> {start_from['name'] if start_from else 'Your location'} <b>→ To</b> {focus['building']} – {focus['name']} (Room {focus['room']})</p>
-        <hr style="margin: 8px 0;">
-        <p><b>Step 1.</b> Walk from your current location toward <b>{focus['building']}</b>. Follow the blue route on the map.</p>
-        <p><b>Step 2.</b> Enter <b>{focus['building']}</b> through the main entrance.</p>
-        <p><b>Step 3.</b> Go to <b>{floor_word}</b> (use stairs or lift).</p>
-        <p><b>Step 4.</b> Find <b>Room {focus['room']}</b> – {focus['name']}. You have arrived.</p>
+        <p><b>1.</b> Follow the blue route on the map to <b>{focus['building']}</b>.</p>
+        <p><b>2.</b> Enter building → <b>{floor_word}</b> → <b>Room {focus['room']}</b>.</p>
         </div>
         """, unsafe_allow_html=True)
         if st.button("Clear destination"):
             st.session_state.map_focus = None
             st.rerun()
-        st.markdown("---")
 
-    # Rooms on this floor (MazeMap-style: list of rooms/facilities on selected floor)
     if selected_floor is not None:
         floor_facilities = [f for f in facilities_all if f[4] == selected_floor]
         floor_label = "Ground" if selected_floor == 0 else f"Floor {selected_floor}"
         with st.expander(f"📋 Rooms on {floor_label}"):
-            if floor_facilities:
-                for f in floor_facilities:
-                    fid, fname, room, ftype, fl, desc, bid, bname, lat, lng = f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8]
-                    st.caption(f"**{fname}** (Room {room}) – {bname}  _{ftype}_")
-            else:
-                st.caption(f"No rooms on {floor_label} in the database.")
-    st.markdown("---")
+            for f in (floor_facilities or []):
+                st.caption(f"**{f[1]}** (Room {f[2]}) – {f[7]}")
 
-    if not buildings:
-        st.info("No buildings in database. Add them in Admin.")
-    else:
-        # Map center and zoom to show both start and destination when route is active
-        if focus and start_from:
-            lat0 = (start_from["lat"] + focus["lat"]) / 2
-            lng0 = (start_from["lng"] + focus["lng"]) / 2
-            zoom = 17
-        elif focus:
-            lat0, lng0 = focus["lat"], focus["lng"]
-            zoom = 18
-        else:
-            lat0, lng0 = buildings[0][2], buildings[0][3]
-            zoom = 17
-        m = folium.Map(location=[lat0, lng0], zoom_start=zoom, tiles="OpenStreetMap")
-
-        # Draw route inside app – goes through campus center so it looks like a walking path
-        if focus and start_from:
-            start_pt = [start_from["lat"], start_from["lng"]]
-            end_pt = [focus["lat"], focus["lng"]]
-            # Route: start → campus center (waypoint) → destination (walking path effect)
-            route_points = [start_pt, [CAMPUS_CENTER["lat"], CAMPUS_CENTER["lng"]], end_pt]
-            folium.PolyLine(
-                locations=route_points,
-                color="#1e88e5",
-                weight=5,
-                opacity=0.8,
-                popup="Walking route via campus center – stay inside campus",
-            ).add_to(m)
-            folium.Marker(
-                [start_from["lat"], start_from["lng"]],
-                popup=folium.Popup(f"<b>You are here</b><br>{start_from['name']}", max_width=200),
-                tooltip="You are here",
-                icon=folium.Icon(color="green", icon="user"),
-            ).add_to(m)
-            # Pulsing "current location" effect (MazeMap-style) – semi-transparent circle
-            folium.Circle(
-                location=[start_from["lat"], start_from["lng"]],
-                radius=25,
-                color="green",
-                fill=True,
-                fill_color="green",
-                fill_opacity=0.15,
-                weight=2,
-                dash_array="5, 5",
-            ).add_to(m)
-            # Fit map to show full route (start + waypoint + destination)
-            all_lats = [start_from["lat"], CAMPUS_CENTER["lat"], focus["lat"]]
-            all_lngs = [start_from["lng"], CAMPUS_CENTER["lng"], focus["lng"]]
-            m.fit_bounds([[min(all_lats), min(all_lngs)], [max(all_lats), max(all_lngs)]], padding=(30, 30))
-
-        # College name on map
-        campus_title_html = """
-        <div style="position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:9999;
-                    background:white; padding:10px 16px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.2);
-                    font-size:14px; font-weight:bold; text-align:center;">
-        PR Pote Patil College of Engineering and Management, Amravati<br>
-        <span style="font-size:11px; font-weight:normal;">Pote Estate, Kathora Road, Amravati – 444602</span>
-        </div>
-        """
-        m.get_root().html.add_child(folium.Element(campus_title_html))
-
-        # Legend
-        legend_html = """
-        <div style="position:fixed; bottom:30px; left:10px; z-index:9999; background:white; padding:8px 12px; border-radius:6px; box-shadow:0 2px 6px rgba(0,0,0,0.2); font-size:12px;">
-        <b>Lab</b> <span style="color:green">●</span> &nbsp;
-        <b>Classroom</b> <span style="color:blue">●</span> &nbsp;
-        <b>Office</b> <span style="color:orange">●</span> &nbsp;
-        <b>Library</b> <span style="color:purple">●</span>
-        </div>
-        """
-        m.get_root().html.add_child(folium.Element(legend_html))
-
-        for b in buildings:
-            bid, name, lat, lng, desc = b
-            popup_html = f"<b>{name}</b><br>{desc or ''}<br><br><i>Buildings contain rooms – tap blue/green/orange/purple markers for rooms.</i>"
-            folium.Marker(
-                [lat, lng],
-                popup=folium.Popup(popup_html, max_width=220),
-                tooltip=name,
-                icon=folium.Icon(color="red", icon="info-sign"),
-            ).add_to(m)
-        for f in facilities:
-            fid, fname, room, ftype, floor, desc, bid, bname, lat, lng = f
-            color = FACILITY_COLORS.get(ftype, "blue")
-            directions = f"Go to <b>{bname}</b> → Floor {floor} → Room {room}"
-            popup_html = f"<b>{fname}</b> (Room {room})<br>Type: {ftype}<br>Floor: {floor}<br>{desc or ''}<br><br><b>Directions:</b> {directions}<br><i>Select this as destination above to see the route on the map.</i>"
-            folium.CircleMarker(
-                [lat, lng],
-                radius=8,
-                popup=folium.Popup(popup_html, max_width=260),
-                tooltip=f"{fname} – {room} ({ftype})",
-                color=color,
-                fill=True,
-                fillColor=color,
-            ).add_to(m)
-        st_folium(m, use_container_width=True, height=550)
     conn.close()
     st.stop()
 
